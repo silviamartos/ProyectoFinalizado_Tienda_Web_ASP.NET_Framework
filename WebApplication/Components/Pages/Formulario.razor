@@ -1,0 +1,285 @@
+@namespace WebApplication.Components.Pages.Formulario
+
+@page "/Formulario"
+@rendermode InteractiveServer
+@using Controllers
+@using DataBase
+@using Dominio
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager NavigationManager
+@inject ILogger<Formulario> Logger
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<div id="customAlert" class="custom-alert-content" style="display: @(showAlert ? "block" : "none"); position: fixed; left: 42%; top: 40%; background-color: rgba(144, 238, 144, 0.5); z-index: 1000; padding: 20px;">
+    <div class="alert alert-success" role="alert">
+        ¡Agregado/Modificado exitosamente!
+    </div>
+    <div style="margin-top: 10px;">
+        <button class="btn btn-success" style="display: block; margin: 0 auto;" @onclick="HandleAceptar">Aceptar</button>
+    </div>
+</div>
+
+<div style="display: flex; justify-content: space-between; gap: 20px;">
+    <div class="col" style="width: 60%; background-color: #f8f9fa; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+        <h1 style="color: #007bff; text-align: center;">Agregar Producto</h1>
+        <br />
+        <div class="mb-3">
+            <label for="barracodigo" class="form-label" style="color: #343a40;">Codigo</label>
+            <input @bind="barracodigo" class="form-control @(codigoInvalid ? "is-invalid" : "")" id="barracodigo" style="border-color: #ced4da;" />
+        </div>
+        <div class="mb-3">
+            <label for="barraproducto" class="form-label" style="color: #343a40;">Producto</label>
+            <input @bind="barraproducto" type="text" class="form-control @(productoInvalid ? "is-invalid" : "")" id="barraproducto" style="border-color: #ced4da;" />
+        </div>
+        <div class="mb-3">
+            <label for="barraimagen" class="form-label" style="color: #343a40;">Imagen (URL)</label>
+            <input @bind="barraimagen" @bind:event="oninput" @oninput="BarraimagenTextChanged" type="url" class="form-control @(imagenInvalid ? "is-invalid" : "")" id="barraimagen" style="border-color: #ced4da;" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label" style="color: #343a40;">Categoria</label>
+            <select @bind="barracategoria" class="form-select" style="border-color: #ced4da;">
+                <option value="Celulares">Celulares</option>
+                <option value="Televisores">Televisores</option>
+                <option value="Media">Media</option>
+                <option value="Audio">Audio</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" style="color: #343a40;">Marca</label>
+            <select @bind="barramarca" class="form-select" style="border-color: #ced4da;">
+                <option value="Samsung">Samsung</option>
+                <option value="Apple">Apple</option>
+                <option value="Sony">Sony</option>
+                <option value="Huawei">Huawei</option>
+                <option value="Motorola">Motorola</option>
+            </select>
+        </div>
+        <br />
+        <div style="text-align: center;">
+            <button class="btn btn-primary" style="margin-right: 10px;" @onclick="ValidacionYAgregar">Agregar producto</button>
+            <button class="btn btn-secondary" @onclick="CancelarClick">Cancelar operacion</button>
+        </div>
+    </div>
+
+    <div style="width: 35%; background-color: #f8f9fa; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+        <div class="mb-3">
+            <label class="form-label" style="color: #343a40;">Precio</label>
+            <input @bind="barraprecio" class="form-control @(precioInvalid ? "is-invalid" : "")" id="barraprecio" type="number" min="1" style="border-color: #ced4da;" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label" style="color: #343a40;">Descripcion</label>
+            <input @bind="barradescripcion" class="form-control" style="border-color: #ced4da;" />
+        </div>
+        <img src="@panelImagenSrc" style="width: 100%; border: 1px solid #ced4da; border-radius: 5px; height:400px" />
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "ID")]
+    public string? ID { get; set; }
+
+    private List<Marca> listaMarca { get; set; } = new List<Marca>();
+    private List<Categoria> listaCategoria { get; set; } = new List<Categoria>();
+    private List<Articulos> Articulos { get; set; } = new List<Articulos>();
+
+    private string barracodigo = string.Empty;
+    private string barraproducto = string.Empty;
+    private string barraimagen = string.Empty;
+    private string barracategoria = "Celulares";
+    private string barramarca = "Samsung";
+    private string barraprecio = string.Empty;
+    private string barradescripcion = string.Empty;
+    private string panelImagenSrc = "https://img.freepik.com/vector-premium/icono-marco-fotos-foto-vacia-blanco-vector-sobre-fondo-transparente-aislado-eps-10_399089-1290.jpg";
+
+    private bool showAlert = false;
+    private bool codigoInvalid = false;
+    private bool productoInvalid = false;
+    private bool imagenInvalid = false;
+    private bool precioInvalid = false;
+    private bool isInitialLoad = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (!user.Identity?.IsAuthenticated ?? true)
+            {
+                NavigationManager.NavigateTo("/Login", true);
+                return;
+            }
+
+            // Check user type from claims or session equivalent
+            var tipoUsuarioClaim = user.FindFirst("TipoDeUsuario")?.Value;
+            if (tipoUsuarioClaim == "0")
+            {
+                Logger.LogWarning("User attempted to access Formulario without admin privileges");
+                NavigationManager.NavigateTo("/Error?message=Debes ser administrador para acceder al formulario", true);
+                return;
+            }
+
+            Controler control = new Controler();
+            listaCategoria = control.CategoriaLista();
+            listaMarca = control.MarcaListar();
+            Articulos = control.listar();
+
+            // Load existing article if ID is provided
+            if (!string.IsNullOrEmpty(ID))
+            {
+                var article = Articulos.FirstOrDefault(item => item.Id.ToString() == ID);
+                if (article != null)
+                {
+                    barracodigo = article.Codigo;
+                    barraproducto = article.Nombre;
+                    barraimagen = article.Imagen;
+                    panelImagenSrc = article.Imagen;
+                    barracategoria = article.Categoria;
+                    barramarca = article.Marca;
+                    barraprecio = article.Precio.ToString();
+                    barradescripcion = article.Descripcion;
+                }
+            }
+
+            isInitialLoad = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading Formulario page");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.Message)}", true);
+        }
+    }
+
+    private void CancelarClick()
+    {
+        NavigationManager.NavigateTo("/Productos", true);
+    }
+
+    private void ValidacionYAgregar()
+    {
+        // Reset validation states
+        codigoInvalid = false;
+        productoInvalid = false;
+        imagenInvalid = false;
+        precioInvalid = false;
+
+        bool isValid = true;
+
+        if (string.IsNullOrWhiteSpace(barracodigo))
+        {
+            codigoInvalid = true;
+            isValid = false;
+        }
+
+        if (string.IsNullOrWhiteSpace(barraproducto))
+        {
+            productoInvalid = true;
+            isValid = false;
+        }
+
+        if (string.IsNullOrWhiteSpace(barraimagen))
+        {
+            imagenInvalid = true;
+            isValid = false;
+        }
+
+        if (string.IsNullOrWhiteSpace(barraprecio))
+        {
+            precioInvalid = true;
+            isValid = false;
+        }
+
+        if (!isValid)
+        {
+            return;
+        }
+
+        showAlert = true;
+    }
+
+    private void HandleAceptar()
+    {
+        BotonagregarproductoClick();
+    }
+
+    private void BotonagregarproductoClick()
+    {
+        try
+        {
+            Controler control = new Controler();
+
+            if (!string.IsNullOrWhiteSpace(barracodigo) && 
+                !string.IsNullOrWhiteSpace(barraproducto) && 
+                !string.IsNullOrWhiteSpace(barraprecio) && 
+                !string.IsNullOrWhiteSpace(barraimagen))
+            {
+                Categoria categoria = new Categoria();
+                Marca marca = new Marca();
+
+                Articulos newArticulo = new Articulos(categoria, marca);
+                newArticulo.Codigo = barracodigo;
+                newArticulo.Nombre = barraproducto;
+
+                if (string.IsNullOrWhiteSpace(barraimagen))
+                {
+                    newArticulo.Imagen = "https://img.freepik.com/vector-premium/icono-marco-fotos-foto-vacia-blanco-vector-sobre-fondo-transparente-aislado-eps-10_399089-1290.jpg";
+                }
+                else
+                {
+                    newArticulo.Imagen = barraimagen;
+                }
+
+                categoria = listaCategoria.Find(x => x.Categorias == barracategoria);
+                marca = listaMarca.Find(x => x.Marcas == barramarca);
+                string nuevoPrecio = barraprecio.Replace(".", "").Replace(",", "");
+                newArticulo.Precio = int.Parse(nuevoPrecio);
+                newArticulo.Descripcion = barradescripcion;
+
+                if (!string.IsNullOrEmpty(ID))
+                {
+                    newArticulo.Id = int.Parse(ID);
+                    control.Modificar(newArticulo, categoria, marca);
+                }
+                else
+                {
+                    control.Agregar(newArticulo, categoria, marca);
+                }
+
+                NavigationManager.NavigateTo("/Productos", true);
+            }
+            else
+            {
+                Logger.LogWarning("Some fields were not completed");
+                NavigationManager.NavigateTo("/Error?message=Algunos campos no se han completados, verifiquelos.", true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error adding/modifying product");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.Message)}", true);
+        }
+    }
+
+    private void BarraimagenTextChanged(ChangeEventArgs e)
+    {
+        try
+        {
+            barraimagen = e.Value?.ToString() ?? string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(barraimagen))
+            {
+                panelImagenSrc = barraimagen;
+            }
+            else
+            {
+                panelImagenSrc = "https://img.freepik.com/vector-premium/icono-marco-fotos-foto-vacia-blanco-vector-sobre-fondo-transparente-aislado-eps-10_399089-1290.jpg";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error changing image URL");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.Message)}", true);
+        }
+    }
+}

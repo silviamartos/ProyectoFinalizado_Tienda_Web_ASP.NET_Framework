@@ -1,0 +1,103 @@
+@namespace WebApplication.Components.Pages.DetallesArticuloCliente
+
+@page "/DetallesArticuloCliente"
+@using Controllers
+@using Dominio
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Authorization
+@rendermode InteractiveServer
+@inject NavigationManager NavigationManager
+@inject ILogger<DetallesArticuloCliente> Logger
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div style="color: red; padding: 20px;">
+        <p>@errorMessage</p>
+    </div>
+}
+else if (Articulo != null)
+{
+    <div style="width: 90%; max-width: 400px; margin: 0 auto; background-color: #f0f4f8; padding: 20px;">
+        <h1 style="color: #000; text-align: center; font-size: 1.5rem;">Detalles del producto</h1>
+        <br />
+        <div style="background-color: #ffffff; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); padding: 10px;">
+            <div style="display: flex; justify-content: center">
+                <img src="@Articulo.Imagen" style="width: 50%; height: auto; border-radius: 8px;" alt="Producto">
+            </div>
+            <div style="padding: 10px;">
+                <h5 style="color: #000; font-size: 1.2rem;">Producto: @Articulo.Nombre</h5>
+                <p style="color: #555; font-size: 0.9rem;">Descripción: @Articulo.Descripcion</p>
+                <p style="color: #555; font-size: 0.9rem;"><small>Categoría: @Articulo.Categoria</small></p>
+                <p style="color: #555; font-size: 0.9rem;"><small>Marca: @Articulo.Marca</small></p>
+                <p style="color: #555; font-size: 0.9rem;"><small>AR$@Articulo.Precio</small></p>
+                <button @onclick="BotonVolverde_Click" style="background-color: #007bff; border: none; color: #fff; padding: 8px 16px; text-align: center; text-decoration: none; display: inline-block; font-size: 0.9rem; border-radius: 5px; cursor: pointer;">
+                    Volver a la Pag. principal
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    public List<Articulos> Lista { get; set; }
+    public Articulos Articulo { get; set; }
+    private string errorMessage;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "ID")]
+    public string ID { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user?.Identity?.IsAuthenticated != true)
+            {
+                NavigationManager.NavigateTo("/Login", false);
+                return;
+            }
+
+            Controler control = new Controler();
+            Lista = control.listar();
+
+            if (!string.IsNullOrEmpty(ID))
+            {
+                if (int.TryParse(ID, out int articleId))
+                {
+                    Articulo = Lista.Find(x => x.Id == articleId);
+                    
+                    if (Articulo == null)
+                    {
+                        errorMessage = "Artículo no encontrado.";
+                        Logger.LogWarning($"Artículo con ID {articleId} no encontrado.");
+                    }
+                }
+                else
+                {
+                    errorMessage = "ID de artículo inválido.";
+                    Logger.LogWarning($"ID de artículo inválido: {ID}");
+                }
+            }
+            else
+            {
+                errorMessage = "No se proporcionó un ID de artículo.";
+                Logger.LogWarning("No se proporcionó un ID de artículo en la URL.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al cargar los detalles del artículo");
+            errorMessage = "Ocurrió un error al cargar los detalles del artículo.";
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.ToString())}", false);
+        }
+    }
+
+    protected void BotonVolverde_Click()
+    {
+        NavigationManager.NavigateTo("/ProductosCliente", false);
+    }
+}

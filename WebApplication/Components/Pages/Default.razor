@@ -1,0 +1,100 @@
+@namespace WebApplication.Components.Pages.Default
+
+@page "/"
+@page "/Default"
+@rendermode InteractiveServer
+@using Dominio
+@inject NavigationManager NavigationManager
+@inject ILogger<Default> Logger
+
+<div class="container">
+    <div class="row row-cols-1 row-cols-md-3 g-4">
+        <div class="col">
+            <div class="card h-100" style="border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+                <img src="https://media.istockphoto.com/id/1284455691/pt/foto/young-couple-in-shopping.jpg?s=612x612&w=0&k=20&c=KdqFtgtzTk8VHLh98f3s6GesASrqE6aKUndFAId0qKA="
+                    class="card-img-top" alt="Productos" style="border-bottom: 1px solid #dee2e6;">
+                <div class="card-body" style="background-color: #fff;">
+                    <h5 class="card-title">Productos</h5>
+                    <p class="card-text" style="color: #333;">Acceder a la lista completa de productos disponibles en tu inventario. Aquí podrás ver detalles, agregar nuevos productos, editar información existente y gestionar todo lo relacionado con tu catálogo de productos.</p>
+                    <button class="btn btn-primary" @onclick="BotonStock_Click"
+                        style="background-color: #007bff; border-color: #007bff; color: white;">Stock de Productos</button>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100" style="border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+                <img src="https://cdn.euroinnova.edu.es/img/subidasEditor/19-1611787074.webp"
+                    class="card-img-top" alt="Registros" style="border-bottom: 1px solid #dee2e6;">
+                <div class="card-body" style="background-color: #fff;">
+                    <h5 class="card-title">Registros</h5>
+                    <p class="card-text" style="color: #333;">Consultar y gestionar todos los registros de ventas. Generar informes detallados para apoyar la toma de decisiones estratégicas.</p>
+                    <button class="btn btn-primary" @onclick="BotonRegistros_Click"
+                        style="background-color: #007bff; border-color: #007bff; color: white;">Registro de ventas</button>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100" style="border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+                <img src="https://estudiocontablevmc.pe/wp-content/uploads/2015/01/registro-de-ventas-e-ingresos-1.jpg"
+                    class="card-img-top" alt="Reportes" style="border-bottom: 1px solid #dee2e6;">
+                <div class="card-body" style="background-color: #fff;">
+                    <h5 class="card-title">Reportes</h5>
+                    <p class="card-text" style="color: #333;">Acceso a los informes y análisis detallados sobre el desempeño de tus productos y operaciones. Obtener recomendaciones basadas en datos para optimizar procesos y mejorar la rentabilidad.</p>
+                    <button class="btn btn-primary" @onclick="BotonReportes_Click"
+                        style="background-color: #007bff; border-color: #007bff; color: white;">Reporte de ventas</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <br />
+    <button class="btn btn-dark" @onclick="ModoCliente_Click"
+        style="background-color: #343a40; border-color: #343a40; color: white; border-radius: 4px; padding: 10px 20px; font-size: 16px;">Modo cliente</button>
+</div>
+
+@code {
+    [CascadingParameter]
+    public Usuarios? UsuarioActivo { get; set; }
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            if (UsuarioActivo == null)
+            {
+                NavigationManager.NavigateTo("/Login", false);
+                return;
+            }
+
+            if (UsuarioActivo.TipoDeUsuario == 0)
+            {
+                Logger.LogWarning("User attempted to access admin page without proper permissions");
+                NavigationManager.NavigateTo("/Error?message=Debes ser administrador para acceder a esta pagina", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during page initialization");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.ToString())}", false);
+        }
+    }
+
+    private void BotonStock_Click()
+    {
+        NavigationManager.NavigateTo("/Productos", false);
+    }
+
+    private void BotonRegistros_Click()
+    {
+        NavigationManager.NavigateTo("/Registros", false);
+    }
+
+    private void BotonReportes_Click()
+    {
+        NavigationManager.NavigateTo("/Reportes", false);
+    }
+
+    private void ModoCliente_Click()
+    {
+        NavigationManager.NavigateTo("/InicioClientes", false);
+    }
+}

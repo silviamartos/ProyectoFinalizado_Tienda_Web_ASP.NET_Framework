@@ -1,0 +1,156 @@
+@namespace WebApplication.Components.Pages.Registrarse
+
+@page "/Registrarse"
+@rendermode InteractiveServer
+@using Dominio
+@using Controllers
+@inject NavigationManager NavigationManager
+@inject ILogger<Registrarse> Logger
+
+<script>
+    function validacion() {
+        const nombre = document.getElementById("barraNombre");
+        const apellido = document.getElementById("barraApellido");
+        const email = document.getElementById("barraEmail");
+        const contraseña = document.getElementById("barraContraseña");
+
+        if (nombre.value === "" || apellido.value === "" || email.value === "" || contraseña.value === "") {
+            if (nombre.value === "") {
+                nombre.classList.add("is-invalid");
+            } else {
+                nombre.classList.remove("is-invalid");
+            }
+            if (apellido.value === "") {
+                apellido.classList.add("is-invalid");
+            } else {
+                apellido.classList.remove("is-invalid");
+            }
+            if (email.value === "") {
+                email.classList.add("is-invalid");
+            } else {
+                email.classList.remove("is-invalid");
+            }
+            if (contraseña.value === "") {
+                contraseña.classList.add("is-invalid");
+            } else {
+                contraseña.classList.remove("is-invalid");
+            }
+            return false;
+        }
+        return true;
+    }
+</script>
+
+<div class="card text-center" style="max-width: 600px; margin: 0 auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); overflow: hidden;">
+    <div class="card-header" style="background-color: #007bff; color: white; border-bottom: 1px solid #dee2e6; border-top-left-radius: 8px; border-top-right-radius: 8px;">
+        <h5 style="margin: 0;">Registrarse</h5>
+    </div>
+    <div class="card-body" style="padding: 20px; background-color: #fff;">
+        <label style="font-weight: bold; color: #333;">Nombre</label>
+        <input id="barraNombre" @bind="barraNombre" style="margin: 8px 0; border-radius: 4px; border: 1px solid #dee2e6; padding: 10px;" class="form-control" />
+
+        <label style="font-weight: bold; color: #333;">Apellido</label>
+        <input id="barraApellido" @bind="barraApellido" style="margin: 8px 0; border-radius: 4px; border: 1px solid #dee2e6; padding: 10px;" class="form-control" />
+
+        <label style="font-weight: bold; color: #333;">Email</label>
+        <input id="barraEmail" type="email" @bind="barraEmail" style="margin: 8px 0; border-radius: 4px; border: 1px solid #dee2e6; padding: 10px;" class="form-control" />
+
+        <label style="font-weight: bold; color: #333;">Contraseña</label>
+        <input id="barraContraseña" type="@(CheckContraseñaVisible ? "text" : "password")" @bind="barraContraseña" @bind:event="oninput" @oninput="OnContraseñaChanged" style="margin: 8px 0; border-radius: 4px; border: 1px solid #dee2e6; padding: 10px;" class="form-control" />
+
+        @if (!string.IsNullOrEmpty(Pass))
+        {
+            <p style="color: #dc3545; margin: 8px 0;">@Pass</p>
+        }
+
+        <div style="margin: 10px 0;">
+            <input type="checkbox" @bind="CheckContraseñaVisible" @bind:event="onchange" @onchange="CheckContraseñaVisible_CheckedChanged" style="accent-color: #007bff;" />
+            <label style="margin-left: 5px;">Mostrar contraseña</label>
+        </div>
+        <br />
+        <button id="botonRegistrarse" style="margin: 8px; background-color: #007bff; border-color: #007bff; color: white; border-radius: 4px; padding: 10px 20px; font-size: 16px;"
+                class="btn" @onclick="BotonRegistrarse_Click" onclick="return validacion()">Registrarse</button>
+        <button id="botonCancelar" style="margin: 8px; background-color: #dc3545; border-color: #dc3545; color: white; border-radius: 4px; padding: 10px 20px; font-size: 16px;"
+                class="btn" @onclick="BotonCancelar_Click">Cancelar</button>
+    </div>
+</div>
+
+@code {
+    private string barraNombre = string.Empty;
+    private string barraApellido = string.Empty;
+    private string barraEmail = string.Empty;
+    private string barraContraseña = string.Empty;
+    private bool CheckContraseñaVisible = false;
+    public string Pass { get; set; } = string.Empty;
+
+    private void BotonCancelar_Click()
+    {
+        NavigationManager.NavigateTo("/Login", false);
+    }
+
+    private void BotonRegistrarse_Click()
+    {
+        try
+        {
+            Usuarios NewUsuario = new Usuarios();
+            Controler control = new Controler();
+            bool ValidarEmail = false;
+
+            NewUsuario.Nombre = barraNombre;
+            NewUsuario.Apellido = barraApellido;
+            NewUsuario.Email = barraEmail;
+            NewUsuario.Contraseña = barraContraseña;
+            NewUsuario.TipoDeUsuario = 0;
+            NewUsuario.ImagenDePerfil = "https://img.freepik.com/vector-premium/icono-marco-fotos-foto-vacia-blanco-vector-sobre-fondo-transparente-aislado-eps-10_399089-1290.jpg";
+
+            ValidarEmail = control.TodosLosUsuarios(NewUsuario);
+
+            if (ValidarEmail == true)
+            {
+                NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString("Ya existe un usuario con el Email ingresado")}", false);
+            }
+            else
+            {
+                control.AgregarUsuario(NewUsuario);
+                NavigationManager.NavigateTo("/Login", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during user registration");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.ToString())}", false);
+        }
+    }
+
+    private void CheckContraseñaVisible_CheckedChanged(ChangeEventArgs e)
+    {
+        try
+        {
+            CheckContraseñaVisible = (bool)(e.Value ?? false);
+
+            if (CheckContraseñaVisible == true)
+            {
+                Pass = barraContraseña;
+            }
+            else
+            {
+                Pass = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling password visibility");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.ToString())}", false);
+        }
+    }
+
+    private void OnContraseñaChanged(ChangeEventArgs e)
+    {
+        barraContraseña = e.Value?.ToString() ?? string.Empty;
+        
+        if (CheckContraseñaVisible)
+        {
+            Pass = barraContraseña;
+        }
+    }
+}

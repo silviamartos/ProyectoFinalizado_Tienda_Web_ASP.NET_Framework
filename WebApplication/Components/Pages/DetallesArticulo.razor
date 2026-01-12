@@ -1,0 +1,96 @@
+@namespace WebApplication.Components.Pages.DetallesArticulo
+
+@page "/DetallesArticulo"
+@rendermode InteractiveServer
+@using Dominio
+@using Controllers
+@inject NavigationManager NavigationManager
+@inject ILogger<DetallesArticulo> Logger
+
+<div style="width: 90%; max-width: 400px; margin: 0 auto; background-color: #f0f4f8; padding: 20px;">
+    @if (Articulo != null)
+    {
+        <h1 style="color: #000; text-align: center; font-size: 1.5rem;">Detalles del producto</h1>
+        <br />
+        <div style="background-color: #ffffff; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); padding: 10px;">
+            <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 10px;">
+                <img src="@Articulo.Imagen" style="width: 50%; height: auto; border-radius: 8px;" alt="Producto">
+            </div>
+            <div style="padding: 10px;">
+                <h5 style="color: #000; font-size: 1.2rem;">Producto: @Articulo.Nombre</h5>
+                <p style="color: #555; font-size: 0.9rem;">Descripción: @Articulo.Descripcion</p>
+                <p style="color: #555; font-size: 0.9rem;"><small>Categoría: @Articulo.Categoria</small></p>
+                <p style="color: #555; font-size: 0.9rem;"><small>Marca: @Articulo.Marca</small></p>
+                <p style="color: #555; font-size: 0.9rem;"><small>AR$@Articulo.Precio</small></p>
+                <button @onclick="BotonVolverdeDetalles_Click" style="background-color: #007bff; border: none; color: #fff; padding: 8px 16px; text-align: center; text-decoration: none; display: inline-block; font-size: 0.9rem; border-radius: 5px; cursor: pointer;">
+                    Volver a la Pag. principal
+                </button>
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div style="color: red; text-align: center;">
+            <p>@errorMessage</p>
+        </div>
+    }
+</div>
+
+@code {
+    [CascadingParameter]
+    public Usuarios? UsuarioActivo { get; set; }
+
+    [SupplyParameterFromQuery(Name = "ID")]
+    public string? IdParameter { get; set; }
+
+    public List<Articulos>? Lista { get; set; }
+    public Articulos? Articulo { get; set; }
+    private string errorMessage = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            if (UsuarioActivo == null)
+            {
+                NavigationManager.NavigateTo("/Login", false);
+                return;
+            }
+
+            if (UsuarioActivo.TipoDeUsuario == 0)
+            {
+                NavigationManager.NavigateTo("/Error?message=Debes ser administrador para acceder a esta pagina", false);
+                return;
+            }
+
+            Controler control = new Controler();
+            Lista = control.listar();
+
+            if (!string.IsNullOrEmpty(IdParameter) && int.TryParse(IdParameter, out int id))
+            {
+                Articulo = Lista?.Find(x => x.Id == id);
+                
+                if (Articulo == null)
+                {
+                    errorMessage = "Artículo no encontrado";
+                    Logger.LogWarning("Artículo con ID {Id} no encontrado", id);
+                }
+            }
+            else
+            {
+                errorMessage = "ID de artículo no válido";
+                Logger.LogWarning("ID de artículo no válido: {IdParameter}", IdParameter);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al cargar detalles del artículo");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.Message)}", false);
+        }
+    }
+
+    private void BotonVolverdeDetalles_Click()
+    {
+        NavigationManager.NavigateTo("/Productos", false);
+    }
+}

@@ -1,0 +1,396 @@
+@namespace WebApplication.Components.Pages.Registros
+
+@page "/Registros"
+@rendermode InteractiveServer
+@using Controllers
+@using Dominio
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject ProtectedSessionStorage ProtectedSessionStore
+@inject NavigationManager NavigationManager
+@inject ILogger<Registros> Logger
+
+<div class="card text-center" style="border-radius: 8px; border: 1px solid #dee2e6; background-color: white;">
+    <div class="card-header" style="background-color: #007bff; color: white;">
+        <h2 class="card-title">Registro de ventas</h2>
+    </div>
+    <div class="card-body" style="background-color: white;">
+        <button class="btn" @onclick="Inicio_Click"
+                style="background-color: #007bff; border-color: #007bff; color: white; margin: 6px;">Volver</button>
+    </div>
+</div>
+
+<br />
+<br />
+
+@* Alerta de confirmacion de agregado de registro *@
+<div id="customAlert" class="custom-alert-content" style="display: @(showAlert ? "block" : "none"); position: fixed; left: 42%; top: 40%; background-color: rgba(144, 238, 144, 0.5); z-index: 1000; padding: 20px;">
+    <div class="alert alert-success" role="alert">
+        ¡Agregado al registro exitosamente!
+    </div>
+    <div>
+        <button class="btn btn-success" style="display: block; margin: 0 auto;" @onclick="botonagregar_Click">Aceptar</button>
+    </div>
+</div>
+
+@* Área de ventas a seleccionar... *@
+<div class="row row-cols-1 row-cols-md-3 g-4" style="height: 50vw; display: flex; justify-content: center; flex-wrap: wrap; overflow: auto; background-color: #f8f9fa; padding: 20px; border-radius: 8px;">
+
+    <br />
+
+    <div class="row" style="width: 100%;">
+        <div class="col-sm-6 mb-3 mb-sm-0">
+            <div class="card" style="border-radius: 8px; border: 1px solid #dee2e6; background-color: white;">
+                <div class="card-body">
+                    <h5 class="card-title">Código:</h5>
+                    <input type="text" id="barracodigo" class="form-control @(isCodigoInvalid ? "is-invalid" : "")" @bind="barracodigo" @bind:event="oninput" @onchange="barracodigo_TextChanged" style="border: 1px solid #dee2e6;" />
+                    <h5 class="card-title">Cantidad:</h5>
+                    <input type="text" class="form-control" @bind="barracantidad" @bind:event="oninput" @onchange="barracantidad_TextChanged" style="border: 1px solid #dee2e6;" />
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6">
+            <div class="card" style="border-radius: 8px; border: 1px solid #dee2e6; background-color: white;">
+                <div class="card-body">
+                    <h5 class="card-title">Producto:</h5>
+                    <select class="form-control" value="@barraproducto" @onchange="ProductoSelectionChanged" style="border: 1px solid #dee2e6;">
+                        @if (nombres != null)
+                        {
+                            @foreach (var nombre in nombres)
+                            {
+                                <option value="@nombre">@nombre</option>
+                            }
+                        }
+                    </select>
+                    <label style="font-size: 20px; margin: 6px; color: #333333;">@labelpreciototal</label>
+                    <br />
+                    <button class="btn" @onclick="ValidacionYAgregar" style="margin: 6px; background-color: #007bff; border-color: #007bff; color: white;">Agregar al registro</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <br />
+    <br />
+
+    @* Panel de los registros *@
+    <div class="card text-center" style="border-radius: 8px; border: 1px solid #dee2e6; background-color: white; width: 100%;">
+        <div class="card-header" style="background-color: #007bff; color: white;">
+            Listado del registro
+        </div>
+        <div class="card-body">
+            <h5 class="card-title">Buscar por:</h5>
+
+            <div class="card-footer" style="display: flex; justify-content: center; background-color: #f8f9fa; border-top: 1px solid #dee2e6;">
+                <select class="form-control" value="@tipoDeFecha" @onchange="TipoFechaSelectionChanged" style="width: 120px; margin: 6px; border: 1px solid #dee2e6;">
+                    <option value="Mes">Mes</option>
+                    <option value="Año">Año</option>
+                    <option value="Dia-Mes-Año">Dia-Mes-Año</option>
+                </select>
+                <input type="text" class="form-control" @bind="barraFecha" style="width: 200px; margin: 6px; height: 40px; border: 1px solid #dee2e6;" />
+                <button class="btn" @onclick="botonBuscarxFecha_Click" style="margin: 6px; background-color: #007bff; border-color: #007bff; color: white;">Buscar/Refrescar</button>
+            </div>
+
+        </div>
+        <br />
+
+        <div style="max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 8px;">
+            <table class="table" style="border: none;">
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Producto</th>
+                        <th>Cantidad</th>
+                        <th>Fecha</th>
+                        <th>Precio</th>
+                        <th>Eliminar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (registrosList != null)
+                    {
+                        @foreach (var registro in registrosList)
+                        {
+                            <tr>
+                                <td>@registro.Codigo</td>
+                                <td>@registro.Producto</td>
+                                <td>@registro.Cantidad</td>
+                                <td>@registro.Fecha</td>
+                                <td>@registro.Precio</td>
+                                <td>
+                                    <button class="btn" @onclick="() => EliminarRegistro(registro.ID)" style="background-color: #dc3545; border-color: #dc3545; color: white;">Eliminar</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card-footer" style="background-color: #007bff; color: white;"></div>
+    </div>
+    <br />
+    <br />
+</div>
+
+@code {
+    private List<Articulos> lista = new List<Articulos>();
+    private List<RegistroDeVentas> registrosList = new List<RegistroDeVentas>();
+    private List<string> nombres = new List<string>();
+
+    private string barracodigo = "";
+    private string barracantidad = "1";
+    private string barraproducto = "";
+    private string labelpreciototal = "Precio total: AR$";
+    private string tipoDeFecha = "Mes";
+    private string barraFecha = "";
+    private bool showAlert = false;
+    private bool isCodigoInvalid = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var usuarioResult = await ProtectedSessionStore.GetAsync<Usuarios>("UsuarioActivo");
+
+            if (!usuarioResult.Success || usuarioResult.Value == null)
+            {
+                NavigationManager.NavigateTo("/Login", false);
+                return;
+            }
+
+            Usuarios usuario = usuarioResult.Value;
+
+            if (usuario.TipoDeUsuario == 0)
+            {
+                await ProtectedSessionStore.SetAsync("Error", "Debes ser administrador para acceder a los registros");
+                NavigationManager.NavigateTo("/Error", false);
+                return;
+            }
+
+            Controler control = new Controler();
+            lista = control.listar();
+
+            registrosList = control.Registro();
+
+            nombres = new List<string>();
+            foreach (Dominio.Articulos item in lista)
+            {
+                nombres.Add(item.Nombre);
+            }
+
+            if (nombres.Count > 0)
+            {
+                barraproducto = nombres[0];
+            }
+
+            barracantidad = "1";
+            foreach (var item in lista)
+            {
+                if (barraproducto.ToUpper() == item.Nombre.ToUpper())
+                    labelpreciototal = "Precio total: AR$" + item.Precio + "";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in OnInitializedAsync");
+            await ProtectedSessionStore.SetAsync("Error", ex.ToString());
+            NavigationManager.NavigateTo("/Error", false);
+        }
+    }
+
+    private void ValidacionYAgregar()
+    {
+        if (string.IsNullOrEmpty(barracodigo))
+        {
+            isCodigoInvalid = true;
+            return;
+        }
+
+        isCodigoInvalid = false;
+        showAlert = true;
+    }
+
+    private async void botonagregar_Click()
+    {
+        try
+        {
+            showAlert = false;
+
+            if (barracodigo != "")
+            {
+                foreach (var item in lista)
+                {
+                    if (item.Codigo.ToUpper() == barracodigo.ToUpper())
+                    {
+                        RegistroDeVentas newRegistro = new RegistroDeVentas();
+                        newRegistro.Codigo = item.Codigo;
+                        newRegistro.Producto = item.Nombre;
+                        if (barracantidad != "")
+                        {
+                            newRegistro.Cantidad = int.Parse(barracantidad);
+                        }
+                        else
+                        {
+                            newRegistro.Cantidad = 1;
+                        }
+                        string precioFinal = labelpreciototal.Replace("Precio total: AR$", "");
+                        newRegistro.Precio = decimal.Parse(precioFinal);
+                        newRegistro.Fecha = DateTime.Now.ToString("yyyy-MM-dd");
+
+                        Controler control = new Controler();
+                        control.Nuevoregistro(newRegistro);
+                        NavigationManager.NavigateTo("/Registros", true);
+                        return;
+                    }
+                }
+            }
+            else if (barracodigo == "")
+            {
+                await ProtectedSessionStore.SetAsync("Error", "Debe ingresar el codigo del producto");
+                NavigationManager.NavigateTo("/Error", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in botonagregar_Click");
+            await ProtectedSessionStore.SetAsync("Error", ex.ToString());
+            NavigationManager.NavigateTo("/Error", false);
+        }
+    }
+
+    private void barracantidad_TextChanged()
+    {
+        try
+        {
+            string producto = barraproducto;
+            decimal cantidad = string.IsNullOrEmpty(barracantidad) ? 1 : int.Parse(barracantidad);
+            decimal productoPrecio = 0;
+
+            if (barracodigo != "")
+                foreach (var item in lista)
+                {
+                    if (item.Codigo.ToUpper() == barracodigo.ToUpper())
+                        productoPrecio = item.Precio;
+                }
+
+            if (barracantidad != "")
+            {
+                decimal PrecioFinal = cantidad * productoPrecio;
+                labelpreciototal = "Precio total: AR$" + PrecioFinal + "";
+                barraproducto = producto;
+            }
+            else
+            {
+                decimal PrecioFinal = 1 * productoPrecio;
+                labelpreciototal = "Precio total: AR$" + PrecioFinal + "";
+                barraproducto = producto;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in barracantidad_TextChanged");
+        }
+    }
+
+    private async void barracodigo_TextChanged()
+    {
+        try
+        {
+            string nombre = "";
+            if (barracodigo != "")
+            {
+                foreach (Dominio.Articulos item in lista)
+                {
+                    string codigo = item.Codigo.ToUpper();
+                    if (barracodigo.ToUpper() == codigo)
+                    {
+                        nombre = item.Nombre;
+                        barraproducto = nombre.ToString();
+                        labelpreciototal = "Precio total: AR$" + item.Precio + "";
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in barracodigo_TextChanged");
+            await ProtectedSessionStore.SetAsync("Error", ex.ToString());
+            NavigationManager.NavigateTo("/Error", false);
+        }
+    }
+
+    private async void botonBuscarxFecha_Click()
+    {
+        try
+        {
+            List<RegistroDeVentas> ListaDeArt = new List<RegistroDeVentas>();
+            Controler control = new Controler();
+
+            if (barraFecha == "")
+            {
+                registrosList = control.Registro();
+            }
+            else if (tipoDeFecha == "Mes")
+            {
+                ListaDeArt = control.Registro().FindAll(x => x.Fecha.Contains("-" + barraFecha + "-"));
+                registrosList = ListaDeArt;
+            }
+            else if (tipoDeFecha == "Año")
+            {
+                ListaDeArt = control.Registro().FindAll(x => x.Fecha.Contains("-" + barraFecha + ""));
+                registrosList = ListaDeArt;
+            }
+            else if (tipoDeFecha == "Dia-Mes-Año")
+            {
+                ListaDeArt = control.Registro().FindAll(x => x.Fecha.Contains("" + barraFecha + ""));
+                registrosList = ListaDeArt;
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in botonBuscarxFecha_Click");
+            await ProtectedSessionStore.SetAsync("Error", ex.ToString());
+            NavigationManager.NavigateTo("/Error", false);
+        }
+    }
+
+    private void Inicio_Click()
+    {
+        NavigationManager.NavigateTo("/Default", false);
+    }
+
+    private async void EliminarRegistro(int id)
+    {
+        try
+        {
+            Controler control = new Controler();
+            RegistroDeVentas eliminarRegistro = control.Registro().Find(x => x.ID == id);
+
+            if (eliminarRegistro != null)
+            {
+                control.EliminarRegistro(eliminarRegistro.ID);
+                registrosList = control.Registro();
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in EliminarRegistro");
+            await ProtectedSessionStore.SetAsync("Error", ex.ToString());
+            NavigationManager.NavigateTo("/Error", false);
+        }
+    }
+
+    private void ProductoSelectionChanged(ChangeEventArgs e)
+    {
+        barraproducto = e.Value?.ToString() ?? "";
+    }
+
+    private void TipoFechaSelectionChanged(ChangeEventArgs e)
+    {
+        tipoDeFecha = e.Value?.ToString() ?? "Mes";
+    }
+}
