@@ -1,0 +1,65 @@
+@namespace WebApplication.Components.Pages.Error
+
+@page "/Error"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject NavigationManager NavigationManager
+@inject ProtectedSessionStorage SessionStorage
+@inject ILogger<Error> Logger
+
+<div style="display: flex; justify-content: center; align-items: center; height: 70vh; background-color: #f0f2f5; padding: 20px;">
+    <div style="max-width: 400px; width: 100%; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); text-align: center; padding: 20px;">
+        <img src="https://img.freepik.com/vector-premium/advertencia-error-sistema-operativo-ventana-mensaje-emergente-ventana-dialogo-falla-sistema-diseno-plano_812892-54.jpg"
+            alt="Error"
+            style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 15px;" />
+        <h1 style="font-size: 24px; color: #333; margin-bottom: 15px;">¡Ups! Algo salió mal.</h1>
+        <p class="card-text" style="font-size: 16px; color: #666; margin-bottom: 15px;">@mensajeDeError</p>
+        <p style="font-size: 14px; color: #999; margin-bottom: 20px;"><small>Lo sentimos por los inconvenientes. Por favor, regresa a la página principal.</small></p>
+        <button @onclick="VolverAlInicio_Click"
+            class="btn btn-primary"
+            style="background-color: #007bff; border-color: #007bff; color: #fff; border-radius: 4px; padding: 8px 16px; font-size: 14px; cursor: pointer;">
+            Volver al inicio
+        </button>
+    </div>
+</div>
+
+@code {
+    private string mensajeDeError = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var result = await SessionStorage.GetAsync<string>("Error");
+            if (result.Success && !string.IsNullOrEmpty(result.Value))
+            {
+                mensajeDeError = result.Value;
+                Logger.LogInformation("Error message retrieved from session: {ErrorMessage}", mensajeDeError);
+            }
+            else
+            {
+                Logger.LogWarning("No error message found in session");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error retrieving error message from session");
+        }
+    }
+
+    private async Task VolverAlInicio_Click()
+    {
+        try
+        {
+            await SessionStorage.DeleteAsync("Error");
+            Logger.LogInformation("Error session cleared, redirecting to InicioClientes");
+            NavigationManager.NavigateTo("/InicioClientes", false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error clearing session and redirecting");
+            // Fallback navigation even if session clear fails
+            NavigationManager.NavigateTo("/InicioClientes", false);
+        }
+    }
+}

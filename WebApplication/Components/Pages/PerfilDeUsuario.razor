@@ -1,0 +1,293 @@
+@namespace WebApplication.Components.Pages.PerfilDeUsuario
+
+@page "/PerfilDeUsuario"
+@rendermode InteractiveServer
+@using Controllers
+@using Dominio
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using Newtonsoft.Json
+@inject NavigationManager NavigationManager
+@inject ILogger<PerfilDeUsuario> Logger
+
+<div class="card text-center" style="border-radius: 8px; border: 1px solid #dee2e6; background-color: white;">
+    <div class="card-header" style="background-color: #007bff; color: white;">
+        <h5 class="card-title">Perfil de usuario</h5>
+    </div>
+    <div class="card-body" style="background-color: white;">
+        <button class="btn"
+                style="background-color: #17a2b8; border-color: #17a2b8; color: white; margin: 6px;"
+                @onclick="GuardarCambios_Click">
+            Guardar cambios
+        </button>
+        <button class="btn"
+                style="background-color: #007bff; border-color: #007bff; color: white; margin: 6px;"
+                @onclick="VolverAtras_Click">
+            Volver
+        </button>
+        <p style="margin-left: 40px; color: #333;">Los cambios realizados se verán reflejados la próxima vez que inicies sesión...</p>
+    </div>
+    <div class="card-footer" style="background-color: #007bff; color: white;">
+    </div>
+</div>
+
+<br />
+
+<div class="row" style="flex-wrap: wrap;">
+    <div class="col-sm-6 mb-3 mb-sm-0">
+        <div class="card" style="border-radius: 8px; border: 1px solid #dee2e6; background-color: white;">
+            <div class="card-body" style="background-color: white;">
+                <label>Nombre</label>
+                <input class="form-control @(nombreInvalid ? "is-invalid" : "")"
+                       id="barraNombre"
+                       style="margin: 6px;"
+                       @bind="barraNombre" />
+                <br />
+                <label>Apellido</label>
+                <input class="form-control @(apellidoInvalid ? "is-invalid" : "")"
+                       id="barraApellido"
+                       style="margin: 6px;"
+                       @bind="barraApellido" />
+                <br />
+                <label>Contraseña</label>
+                <input class="form-control @(contraseñaInvalid ? "is-invalid" : "")"
+                       id="barraContraseña"
+                       style="margin: 6px;"
+                       type="password"
+                       @bind="barraContraseña"
+                       @oninput="OnContraseñaChanged" />
+                @if (!string.IsNullOrEmpty(Pass))
+                {
+                    <p style="margin: 6px; color: #333;">@Pass</p>
+                }
+                <div class="form-check">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           id="CheckContraseñaVisible"
+                           @bind="CheckContraseñaVisible"
+                           @onchange="CheckContraseñaVisible_CheckedChanged" />
+                    <label class="form-check-label" for="CheckContraseñaVisible">
+                        _Mostrar contraseña
+                    </label>
+                </div>
+                <br />
+                <button class="btn"
+                        style="background-color: #dc3545; border-color: #dc3545; color: white; margin: 6px;"
+                        @onclick="cerrarSesion_Click">
+                    Cerrar sesión
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6" style="overflow: hidden;">
+        <div class="card" style="border-radius: 8px; border: 1px solid #dee2e6; background-color: white;">
+            <div class="card-body" style="background-color: white; overflow: hidden;">
+                <label>Imagen del perfil</label>
+                <input class="form-control @(imagenInvalid ? "is-invalid" : "")"
+                       id="barraImagen"
+                       style="margin: 6px;"
+                       @bind="barraImagen"
+                       @oninput="barraImagen_TextChanged" />
+                <br />
+                <img style="height: 300px; width: 300px; display: block; margin-left: auto; margin-right: auto;"
+                     src="@panelImagenSrc"
+                     alt="Alternate Text" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function validacion() {
+        const nombre = document.getElementById("barraNombre");
+        const apellido = document.getElementById("barraApellido");
+        const imagen = document.getElementById("barraImagen");
+        const contraseña = document.getElementById("barraContraseña");
+
+        if (nombre.value == "" || apellido.value == "" || imagen.value == "" || contraseña.value == "") {
+
+            if (nombre.value == "") {
+                nombre.classList.add("is-invalid");
+                apellido.classList.remove("is-invalid");
+                imagen.classList.remove("is-invalid");
+                contraseña.classList.remove("is-invalid");
+                return false;
+            } else if (apellido.value == "") {
+                apellido.classList.add("is-invalid");
+                nombre.classList.remove("is-invalid");
+                imagen.classList.remove("is-invalid");
+                contraseña.classList.remove("is-invalid");
+                return false;
+            } else if (imagen.value == "") {
+                imagen.classList.add("is-invalid");
+                nombre.classList.remove("is-invalid");
+                apellido.classList.remove("is-invalid");
+                contraseña.classList.remove("is-invalid");
+                return false;
+            } else if (contraseña.value == "") {
+                contraseña.classList.add("is-invalid");
+                nombre.classList.remove("is-invalid");
+                apellido.classList.remove("is-invalid");
+                imagen.classList.remove("is-invalid");
+                return false;
+            }
+        }
+    }
+</script>
+
+@code {
+    private Usuarios usuario { get; set; }
+    private string Pass { get; set; }
+    private string barraNombre { get; set; }
+    private string barraApellido { get; set; }
+    private string barraContraseña { get; set; }
+    private string barraImagen { get; set; }
+    private bool CheckContraseñaVisible { get; set; }
+    private string panelImagenSrc { get; set; } = "https://img.freepik.com/vector-premium/icono-marco-fotos-foto-vacia-blanco-vector-sobre-fondo-transparente-aislado-eps-10_399089-1290.jpg";
+
+    private bool nombreInvalid = false;
+    private bool apellidoInvalid = false;
+    private bool contraseñaInvalid = false;
+    private bool imagenInvalid = false;
+
+    [CascadingParameter]
+    public HttpContext HttpContext { get; set; }
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            if (HttpContext?.Session.GetString("UsuarioActivo") == null)
+            {
+                NavigationManager.NavigateTo("/Login", false);
+            }
+            else
+            {
+                var usuarioJson = HttpContext.Session.GetString("UsuarioActivo");
+                usuario = Newtonsoft.Json.JsonConvert.DeserializeObject<Usuarios>(usuarioJson);
+
+                barraNombre = usuario.Nombre;
+                barraApellido = usuario.Apellido;
+                barraContraseña = usuario.Contraseña;
+                barraImagen = usuario.ImagenDePerfil;
+                panelImagenSrc = usuario.ImagenDePerfil?.ToString();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in Page_Load");
+            HttpContext.Session.SetString("Error", ex.ToString());
+            NavigationManager.NavigateTo("/Error", false);
+        }
+    }
+
+    private void barraImagen_TextChanged(ChangeEventArgs e)
+    {
+        barraImagen = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(barraImagen))
+        {
+            panelImagenSrc = barraImagen;
+        }
+    }
+
+    private void OnContraseñaChanged(ChangeEventArgs e)
+    {
+        barraContraseña = e.Value?.ToString();
+        if (CheckContraseñaVisible)
+        {
+            Pass = barraContraseña;
+        }
+    }
+
+    private void VolverAtras_Click()
+    {
+        NavigationManager.NavigateTo("/ProductosCliente", false);
+    }
+
+    private void GuardarCambios_Click()
+    {
+        try
+        {
+            // Reset validation states
+            nombreInvalid = false;
+            apellidoInvalid = false;
+            contraseñaInvalid = false;
+            imagenInvalid = false;
+
+            // Validate fields
+            if (string.IsNullOrEmpty(barraNombre))
+            {
+                nombreInvalid = true;
+                return;
+            }
+            if (string.IsNullOrEmpty(barraApellido))
+            {
+                apellidoInvalid = true;
+                return;
+            }
+            if (string.IsNullOrEmpty(barraContraseña))
+            {
+                contraseñaInvalid = true;
+                return;
+            }
+            if (string.IsNullOrEmpty(barraImagen))
+            {
+                imagenInvalid = true;
+                return;
+            }
+
+            Usuarios UserModificado = new Usuarios();
+            var usuarioJson = HttpContext.Session.GetString("UsuarioActivo");
+            Usuarios UserViejo = Newtonsoft.Json.JsonConvert.DeserializeObject<Usuarios>(usuarioJson);
+            Controler control = new Controler();
+
+            if (!string.IsNullOrEmpty(barraApellido) && !string.IsNullOrEmpty(barraNombre) &&
+                !string.IsNullOrEmpty(barraContraseña) && !string.IsNullOrEmpty(barraImagen))
+            {
+                UserModificado.Id = UserViejo.Id;
+                UserModificado.Nombre = barraNombre;
+                UserModificado.Apellido = barraApellido;
+                UserModificado.Contraseña = barraContraseña;
+                UserModificado.ImagenDePerfil = barraImagen;
+
+                control.ModificarUsuario(UserModificado);
+                NavigationManager.NavigateTo("/ProductosCliente", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in GuardarCambios_Click");
+            HttpContext.Session.SetString("Error", ex.ToString());
+            NavigationManager.NavigateTo("/Error", false);
+        }
+    }
+
+    private void cerrarSesion_Click()
+    {
+        HttpContext.Session.Remove("UsuarioActivo");
+        NavigationManager.NavigateTo("/Login", false);
+    }
+
+    private void CheckContraseñaVisible_CheckedChanged(ChangeEventArgs e)
+    {
+        try
+        {
+            CheckContraseñaVisible = (bool)e.Value;
+
+            if (CheckContraseñaVisible)
+            {
+                Pass = barraContraseña;
+            }
+            else
+            {
+                Pass = "";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in CheckContraseñaVisible_CheckedChanged");
+            HttpContext.Session.SetString("Error", ex.ToString());
+            NavigationManager.NavigateTo("/Error", false);
+        }
+    }
+}

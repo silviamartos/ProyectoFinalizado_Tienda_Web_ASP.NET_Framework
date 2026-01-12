@@ -1,0 +1,198 @@
+@namespace WebApplication.Components.Pages.ProductosCliente
+
+@page "/ProductosCliente"
+@using Controllers
+@using Dominio
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@rendermode InteractiveServer
+@inject NavigationManager NavigationManager
+@inject ILogger<ProductosCliente> Logger
+
+<div class="card text-center mb-4" style="border: 1px solid #dee2e6; border-radius: 0.5rem; background-color: #ffffff;">
+    <div class="card-header" style="background-color: #007bff; color: white;">
+        <h5 class="card-title" style="margin: 0;">Lista de productos:</h5>
+    </div>
+    <div class="card-body" style="padding: 1rem;">
+        <div class="d-flex justify-content-center align-items-center gap-2 mb-3">
+            <input type="text" @bind="barraBuscar" class="form-control" placeholder="Buscar por: Producto/Marca/Categoría"
+                style="width: 400px; border-radius: 0.25rem; border: 1px solid #ced4da;" />
+            <button class="btn btn-primary" @onclick="BuscarArticulos_Click"
+                style="border-radius: 0.25rem; background-color: #007bff; border-color: #007bff; padding: 0.5rem 1rem;">Buscar/Refrescar</button>
+            <button class="btn btn-secondary" @onclick="VolverInicio_Click"
+                style="border-radius: 0.25rem; background-color: #6c757d; border-color: #6c757d; padding: 0.5rem 1rem;">Volver al inicio</button>
+        </div>
+        <NavLink href="/DetallesDeCompra" class="d-inline-block" style="margin: 8px;">
+            <img src="https://cdn-icons-png.flaticon.com/512/3225/3225209.png" alt="Carrito de Compras" class="img-fluid"
+                style="width: 35px; height: auto;" />
+        </NavLink>
+        <span class="d-inline-block ms-2" style="font-size: 20px; color: black;">@labelCantidad</span>
+    </div>
+</div>
+
+<!-- Cargar todos los artículos disponibles -->
+<div class="row row-cols-1 row-cols-md-3 g-4">
+    @if (productos != null)
+    {
+        @foreach (var item in productos)
+        {
+            <div class="card mb-4" style="border: 1px solid #dee2e6; border-radius: 0.5rem; box-shadow: 0 4px 8px rgba(0,0,0,0.2); overflow: hidden; height: 380px; width: 330px">
+                <div class="row g-0" style="display: flex; justify-content: center">
+                    <div class="col-md-12" style="overflow: hidden; width: 70%; height: 160px;">
+                        <img src="@item.Imagen" class="img-fluid" alt="Error de carga"
+                            style="width: 100%; height: 100%; object-fit: contain;" />
+                    </div>
+                    <div class="col-md-12" style="height: 210px">
+                        <div class="card-body" style="background-color: #ffffff; color: #333;">
+                            <h5 class="card-title" style="margin-bottom: 0.5rem;">@item.Nombre</h5>
+                            <p class="card-text" style="margin-bottom: 0.5rem;">@item.Marca</p>
+                            <p class="card-text" style="margin-bottom: 0.5rem;">@item.Descripcion</p>
+                            <p class="card-text"><small class="text-muted" style="color: #6c757d;">AR$@item.Precio</small></p>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-info" @onclick="() => AgregarCarrito_Click(item.Id)"
+                                    style="background-color: #17a2b8; border-color: #17a2b8; border-radius: 0.25rem; padding: 0.5rem 1rem;">Agregar al carrito</button>
+                                <button class="btn btn-primary" @onclick="() => detalles_Click(item.Id)"
+                                    style="background-color: #007bff; border-color: #007bff; border-radius: 0.25rem; padding: 0.5rem 1rem;">Ver detalles</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private string barraBuscar = string.Empty;
+    private int labelCantidad = 0;
+    private List<Articulos> productos;
+    private List<Articulos> listaCarrito = new List<Articulos>();
+    private string categoriaSession;
+    private object usuarioActivo;
+
+    protected override void OnInitialized()
+    {
+        Controler control = new Controler();
+
+        try
+        {
+            // Simulate session retrieval - In Blazor, you would use a state management solution
+            // For this conversion, we'll use component state
+            // categoriaSession = GetSessionValue("Categoria");
+            // usuarioActivo = GetSessionValue("UsuarioActivo");
+
+            if (!string.IsNullOrEmpty(categoriaSession) && usuarioActivo != null)
+            {
+                if (categoriaSession == "Celulares")
+                {
+                    productos = control.listar().FindAll(x => x.Categoria == "Celulares");
+                    categoriaSession = null;
+                }
+                else if (categoriaSession == "Audio")
+                {
+                    productos = control.listar().FindAll(x => x.Categoria == "Audio");
+                    categoriaSession = null;
+                }
+                else if (categoriaSession == "Televisores")
+                {
+                    productos = control.listar().FindAll(x => x.Categoria == "Televisores");
+                    categoriaSession = null;
+                }
+                else if (categoriaSession == "Media")
+                {
+                    productos = control.listar().FindAll(x => x.Categoria == "Media");
+                    categoriaSession = null;
+                }
+            }
+            else
+            {
+                productos = control.listar();
+            }
+
+            // Simulate session retrieval for cart
+            // listaCarrito = GetSessionValue("ListaVieja") as List<Articulos>;
+            if (listaCarrito != null)
+            {
+                labelCantidad = listaCarrito.Count;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading products");
+            NavigationManager.NavigateTo($"/Error?message={ex.Message}", false);
+        }
+    }
+
+    private void detalles_Click(int id)
+    {
+        try
+        {
+            NavigationManager.NavigateTo($"/DetallesArticuloCliente?ID={id}", false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error navigating to product details");
+            NavigationManager.NavigateTo($"/Error?message={ex.Message}", false);
+        }
+    }
+
+    private void VolverInicio_Click()
+    {
+        NavigationManager.NavigateTo("/InicioClientes", false);
+    }
+
+    private void BuscarArticulos_Click()
+    {
+        try
+        {
+            Controler control = new Controler();
+
+            if (!string.IsNullOrEmpty(barraBuscar))
+            {
+                productos = control.listar().FindAll(x => 
+                    x.Nombre.ToUpper().Contains(barraBuscar.ToUpper()) || 
+                    x.Marca.ToUpper().Contains(barraBuscar.ToUpper()) || 
+                    x.Categoria.ToUpper().Contains(barraBuscar.ToUpper()));
+            }
+            else
+            {
+                productos = control.listar();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error searching products");
+            NavigationManager.NavigateTo($"/Error?message={ex.Message}", false);
+        }
+    }
+
+    private void AgregarCarrito_Click(int id)
+    {
+        Controler control = new Controler();
+
+        try
+        {
+            if (usuarioActivo == null)
+            {
+                NavigationManager.NavigateTo("/Login", false);
+            }
+            else
+            {
+                Articulos art = control.listar().Find(x => x.Id == id);
+
+                if (art != null)
+                {
+                    listaCarrito.Add(art);
+                    // Simulate session storage
+                    // SetSessionValue("ListaVieja", listaCarrito);
+                    labelCantidad = listaCarrito.Count;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error adding product to cart");
+            NavigationManager.NavigateTo($"/Error?message={ex.Message}", false);
+        }
+    }
+}

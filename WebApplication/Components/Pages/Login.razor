@@ -1,0 +1,157 @@
+@namespace WebApplication.Components.Pages.Login
+
+@page "/Login"
+@rendermode InteractiveServer
+@using Controllers
+@using Dominio
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@inject NavigationManager NavigationManager
+@inject ILogger<Login> Logger
+
+<div class="card text-center" style="max-width: 600px; margin: 0 auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); overflow: hidden;">
+    <div class="card-header" style="background-color: #007bff; color: white; border-bottom: 1px solid #dee2e6; border-top-left-radius: 8px; border-top-right-radius: 8px;">
+        <h5 style="margin: 0;">Iniciar sesión</h5>
+    </div>
+    <div class="card-body" style="padding: 20px; background-color: #fff;">
+        <label style="font-weight: bold; color: #333;">Email</label>
+        <input type="email" @bind="barraEmail" style="margin: 8px 0; border-radius: 4px; border: 1px solid #dee2e6; padding: 10px;" class="form-control" />
+
+        <label style="font-weight: bold; color: #333;">Contraseña</label>
+        <input type="@(CheckContraseñaVisible ? "text" : "password")" @bind="barraContraseña" @oninput="OnContraseñaChanged" style="margin: 8px 0; border-radius: 4px; border: 1px solid #dee2e6; padding: 10px;" class="form-control" />
+
+        @if (!string.IsNullOrEmpty(Pass))
+        {
+            <p style="color: #dc3545; margin: 8px 0;">@Pass</p>
+        }
+
+        <div style="margin: 10px 0;">
+            <input type="checkbox" @bind="CheckContraseñaVisible" @oninput="CheckContraseñaVisible_CheckedChanged" style="accent-color: #007bff;" />
+            <label style="margin-left: 5px;">Mostrar contraseña</label>
+        </div>
+        <br />
+        <button style="margin: 8px; background-color: #007bff; border-color: #007bff; color: white; border-radius: 4px; padding: 10px 20px; font-size: 16px;"
+                class="btn" @onclick="BtnIniciarSesion_Click">Iniciar sesión</button>
+        <button style="margin: 8px; background-color: #17a2b8; border-color: #17a2b8; color: white; border-radius: 4px; padding: 10px 20px; font-size: 16px;"
+                class="btn" @onclick="botonRegistrarse_Click">Registrarse</button>
+        <br />
+        <button style="margin: 8px; background-color: #dc3545; border-color: #dc3545; color: white; border-radius: 4px; padding: 10px 20px; font-size: 16px;"
+                class="btn" @onclick="botonCancelar_Click">Cancelar</button>
+    </div>
+</div>
+
+@code {
+    public string Pass { get; set; }
+    private string barraEmail { get; set; }
+    private string barraContraseña { get; set; }
+    private bool CheckContraseñaVisible { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Logger.LogInformation("Login page initialized");
+    }
+
+    private void botonRegistrarse_Click()
+    {
+        try
+        {
+            Logger.LogInformation("Redirecting to Registrarse page");
+            NavigationManager.NavigateTo("/Registrarse", false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error redirecting to Registrarse page");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.Message)}", false);
+        }
+    }
+
+    private void botonCancelar_Click()
+    {
+        try
+        {
+            Logger.LogInformation("Cancel button clicked, redirecting to InicioClientes");
+            NavigationManager.NavigateTo("/InicioClientes", false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in cancel button");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.Message)}", false);
+        }
+    }
+
+    private void BtnIniciarSesion_Click()
+    {
+        try
+        {
+            Logger.LogInformation("Login attempt for email: {Email}", barraEmail);
+            
+            Controler control = new Controler();
+            Usuarios NewUsuario = new Usuarios();
+            Usuarios Activo = new Usuarios();
+
+            NewUsuario.Email = barraEmail;
+            NewUsuario.Contraseña = barraContraseña;
+
+            Activo = control.ValidarUsuario(NewUsuario);
+
+            if (Activo.Id != 0)
+            {
+                Logger.LogInformation("User validated successfully: {UserId}", Activo.Id);
+                
+                if (Activo.TipoDeUsuario == 0)
+                {
+                    Logger.LogInformation("Redirecting to ProductosCliente for user type 0");
+                    NavigationManager.NavigateTo("/ProductosCliente", false);
+                }
+                else
+                {
+                    Logger.LogInformation("Redirecting to Default for user type: {UserType}", Activo.TipoDeUsuario);
+                    NavigationManager.NavigateTo("/Default", false);
+                }
+            }
+            else
+            {
+                Logger.LogWarning("Invalid login attempt for email: {Email}", barraEmail);
+                NavigationManager.NavigateTo("/Error?message=" + Uri.EscapeDataString("Email o Contraseña incorrecta."), false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during login process");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.ToString())}", false);
+        }
+    }
+
+    private void OnContraseñaChanged(ChangeEventArgs e)
+    {
+        barraContraseña = e.Value?.ToString();
+        if (CheckContraseñaVisible)
+        {
+            Pass = barraContraseña;
+        }
+    }
+
+    private void CheckContraseñaVisible_CheckedChanged(ChangeEventArgs e)
+    {
+        try
+        {
+            CheckContraseñaVisible = (bool)(e.Value ?? false);
+
+            if (CheckContraseñaVisible)
+            {
+                Pass = barraContraseña;
+            }
+            else
+            {
+                Pass = "";
+            }
+            
+            Logger.LogInformation("Password visibility toggled: {IsVisible}", CheckContraseñaVisible);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling password visibility");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.ToString())}", false);
+        }
+    }
+}

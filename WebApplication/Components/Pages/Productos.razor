@@ -1,0 +1,231 @@
+@namespace WebApplication.Components.Pages.Productos
+
+@page "/Productos"
+@rendermode InteractiveServer
+@using Controllers
+@using Dominio
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager NavigationManager
+@inject ILogger<Productos> Logger
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<div class="card text-center mb-4" style="border: 1px solid #dee2e6; border-radius: 0.5rem; background-color: #ffffff;">
+    <div class="card-header" style="background-color: #007bff; color: white;">
+        <h5 class="card-title" style="margin: 0;">Lista de productos:</h5>
+    </div>
+    <div class="card-body" style="padding: 1rem;">
+        <div class="d-flex flex-column flex-md-row justify-content-center align-items-center gap-2">
+            <input type="text" @bind="busquedaDeArticulos" @bind:event="oninput"
+                   class="form-control"
+                   style="margin: 6px; width: 300px; max-width: 100%;"
+                   placeholder="Buscar por: Codigo/Producto/Marca/Categoria" />
+            <button class="btn btn-primary" @onclick="BuscarArticulos"
+                    style="border-radius: 0.25rem; background-color: #007bff; border-color: #007bff;">
+                Buscar/Refrescar
+            </button>
+        </div>
+        <button class="btn btn-success" @onclick="AgregarProducto"
+                style="border-radius: 0.25rem; background-color: #28a745; border-color: #28a745;">
+            Agregar producto
+        </button>
+        <button class="btn btn-secondary" @onclick="VolverAlInicio"
+                style="border-radius: 0.25rem; background-color: #6c757d; border-color: #6c757d;">
+            Volver al inicio
+        </button>
+    </div>
+</div>
+
+<br />
+
+<!-- Alerta de confirmación de eliminado de artículos -->
+@if (showCustomAlert)
+{
+    <div class="custom-alert-content" style="display: block; position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); background-color: rgba(241, 148, 138, 0.5); z-index: 1000; padding: 20px; border-radius: 0.5rem;">
+        <div class="alert alert-danger" role="alert" style="margin-bottom: 1rem;">
+            Desea eliminar este producto?
+        </div>
+        <div>
+            <button class="btn btn-danger" style="border-radius: 0.25rem; padding: 0.5rem 1rem;"
+                    @onclick="EliminarProducto">
+                Eliminar
+            </button>
+            <button class="btn btn-secondary" style="border-radius: 0.25rem; padding: 0.5rem 1rem;"
+                    @onclick="CerrarAlerta">
+                Cancelar
+            </button>
+        </div>
+    </div>
+}
+
+<!-- Mostrar listado de artículos -->
+<div class="row row-cols-1 row-cols-md-3 g-4">
+    @if (productosAMostrar != null && productosAMostrar.Any())
+    {
+        @foreach (var articulo in productosAMostrar)
+        {
+            <div class="card mb-4" style="border: 1px solid #dee2e6; border-radius: 0.5rem; box-shadow: 0 4px 8px rgba(0,0,0,0.2); overflow: hidden; height: 420px; width: 330px;">
+                <div class="row g-0" style="display: flex; justify-content: center;">
+                    <div class="col-md-12" style="overflow: hidden; width: 70%; height: 160px;">
+                        <img src="@articulo.Imagen" class="img-fluid" alt="Error de carga"
+                             style="width: 100%; height: 100%; object-fit: contain;" />
+                    </div>
+                    <div class="col-md-12" style="padding: 1rem;">
+                        <div class="card-body" style="background-color: #ffffff; color: #333;">
+                            <h5 class="card-title" style="margin-bottom: 0.5rem;">@articulo.Nombre</h5>
+                            <p class="card-text" style="margin-bottom: 0.5rem;">Marca: @articulo.Marca</p>
+                            <p class="card-text" style="margin-bottom: 0.5rem;">Descripcion: @articulo.Descripcion</p>
+                            <p class="card-text"><small class="text-muted" style="color: #6c757d;">AR$@articulo.Precio</small></p>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-info" @onclick="() => ModificarProducto(articulo.Id)"
+                                        style="border-radius: 0.25rem; background-color: #17a2b8; border-color: #17a2b8;">
+                                    Modificar
+                                </button>
+                                <button class="btn btn-danger" @onclick="() => MostrarAlertaEliminar(articulo.Id)"
+                                        style="border-radius: 0.25rem; background-color: #dc3545; border-color: #dc3545;">
+                                    Eliminar
+                                </button>
+                            </div>
+                            <button class="btn btn-primary" @onclick="() => VerDetalles(articulo.Id)"
+                                    style="border-radius: 0.25rem; background-color: #007bff; border-color: #007bff; margin: 5px">
+                                Ver detalles
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private string busquedaDeArticulos = string.Empty;
+    private List<Articulos> Lista { get; set; }
+    private List<Articulos> NuevaLista { get; set; }
+    private List<Articulos> productosAMostrar => NuevaLista ?? Lista;
+    private bool showCustomAlert = false;
+    private int productoIdAEliminar = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (!user.Identity?.IsAuthenticated ?? true)
+            {
+                NavigationManager.NavigateTo("/Login", false);
+                return;
+            }
+
+            // Check if user is admin (TipoDeUsuario == 1)
+            var tipoUsuarioClaim = user.FindFirst("TipoDeUsuario");
+            if (tipoUsuarioClaim == null || tipoUsuarioClaim.Value == "0")
+            {
+                NavigationManager.NavigateTo("/Error?message=Debes ser administrador para acceder a la gestion de productos", false);
+                return;
+            }
+
+            Controler control = new Controler();
+            Lista = control.listar();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error en OnInitializedAsync");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.ToString())}", false);
+        }
+    }
+
+    private void VolverAlInicio()
+    {
+        NavigationManager.NavigateTo("/Default", false);
+    }
+
+    private void AgregarProducto()
+    {
+        NavigationManager.NavigateTo("/Formulario");
+    }
+
+    private void VerDetalles(int id)
+    {
+        try
+        {
+            NavigationManager.NavigateTo($"/DetallesArticulo?ID={id}", false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error en VerDetalles");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.ToString())}", false);
+        }
+    }
+
+    private void ModificarProducto(int id)
+    {
+        try
+        {
+            NavigationManager.NavigateTo($"/Formulario?ID={id}", false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error en ModificarProducto");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.ToString())}", false);
+        }
+    }
+
+    private void MostrarAlertaEliminar(int id)
+    {
+        productoIdAEliminar = id;
+        showCustomAlert = true;
+    }
+
+    private void CerrarAlerta()
+    {
+        showCustomAlert = false;
+        productoIdAEliminar = 0;
+    }
+
+    private void EliminarProducto()
+    {
+        try
+        {
+            if (productoIdAEliminar > 0)
+            {
+                Controler control = new Controler();
+                control.Eliminar(productoIdAEliminar);
+                NavigationManager.NavigateTo("/Productos", true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error en EliminarProducto");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.ToString())}", false);
+        }
+    }
+
+    private void BuscarArticulos()
+    {
+        try
+        {
+            Controler control = new Controler();
+            
+            if (!string.IsNullOrWhiteSpace(busquedaDeArticulos))
+            {
+                NuevaLista = control.listar().FindAll(x => 
+                    x.Nombre.ToUpper().Contains(busquedaDeArticulos.ToUpper()) || 
+                    x.Codigo.ToUpper().Contains(busquedaDeArticulos.ToUpper()) || 
+                    x.Categoria.ToUpper().Contains(busquedaDeArticulos.ToUpper()) || 
+                    x.Marca.ToUpper().Contains(busquedaDeArticulos.ToUpper()));
+            }
+            else
+            {
+                NuevaLista = null;
+                Lista = control.listar();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error en BuscarArticulos");
+            NavigationManager.NavigateTo($"/Error?message={Uri.EscapeDataString(ex.ToString())}", false);
+        }
+    }
+}

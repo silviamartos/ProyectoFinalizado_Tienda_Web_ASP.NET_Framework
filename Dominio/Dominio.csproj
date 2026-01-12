@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dominio</AssemblyName>
+    <Deterministic>true</Deterministic>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Dominio</RootNamespace>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="CarroDeCompras.cs"></Compile>
+  </ItemGroup>
+</Project>

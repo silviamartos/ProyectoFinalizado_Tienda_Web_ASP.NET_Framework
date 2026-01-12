@@ -1,0 +1,181 @@
+@namespace WebApplication.Components.Pages.DetallesDeCompra
+
+@page "/DetallesDeCompra"
+@rendermode InteractiveServer
+@using Controllers
+@using Dominio
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@inject NavigationManager NavigationManager
+@inject ILogger<DetallesDeCompra> Logger
+@inject HttpContext HttpContext
+@using System.Text.Json
+
+<div class="card text-center mb-4" style="border: 1px solid #dee2e6; border-radius: 0.5rem; background-color: #ffffff;">
+    <div class="card-header" style="background-color: #007bff; color: white;">
+        <h5 class="card-title" style="margin: 0;">Tu lista de productos a comprar:</h5>
+    </div>
+    <div class="card-body" style="padding: 1rem;">
+        <div class="d-flex justify-content-center align-items-center gap-2 mb-3">
+            <button class="btn btn-info" @onclick="MostrarConfirmacion"
+                Style="border-radius: 0.25rem; background-color: #17a2b8; border-color: #17a2b8; padding: 0.5rem 1rem;">Confirmar compra</button>
+            <button class="btn btn-primary" @onclick="VolverInicio_Click"
+                Style="border-radius: 0.25rem; background-color: #007bff; border-color: #007bff; padding: 0.5rem 1rem;">Volver al Stock</button>
+        </div>
+        <label style="font-size: 20px; color: #333;">Precio total : AR$@precioTotal</label>
+        <br />
+        <a href="#" class="d-inline-block" style="margin: 8px;">
+            <img src="https://cdn-icons-png.flaticon.com/512/3225/3225209.png" alt="Carrito de Compras" class="img-fluid"
+                style="width: 35px; height: auto;" />
+        </a>
+        <label class="d-inline-block ms-2" style="font-size: 20px; color: black;">@cantidadProductos</label>
+    </div>
+</div>
+
+<br />
+
+<!-- Lista a comprar -->
+<div class="row row-cols-1 row-cols-md-3 g-4">
+    @if (listaCarrito != null && listaCarrito.Any())
+    {
+        @foreach (var articulo in listaCarrito)
+        {
+            <div class="card mb-4" style="border: 1px solid #dee2e6; border-radius: 0.5rem; box-shadow: 0 4px 8px rgba(0,0,0,0.2); overflow: hidden; height: 380px; width: 330px">
+                <div class="row g-0" style="display: flex; justify-content: center">
+                    <div class="col-md-12" style="overflow: hidden; width: 70%; height: 160px">
+                        <img src="@articulo.Imagen" class="img-fluid" alt="Error de carga"
+                            style="width: 100%; height: 100%; object-fit: contain;" />
+                    </div>
+                    <div class="col-md-12" style="height: 210px">
+                        <div class="card-body" style="background-color: #ffffff; color: #333;">
+                            <h5 class="card-title" style="margin-bottom: 0.5rem;">@articulo.Nombre</h5>
+                            <p class="card-text" style="margin-bottom: 0.5rem;">@articulo.Marca</p>
+                            <p class="card-text" style="margin-bottom: 0.5rem;">@articulo.Descripcion</p>
+                            <p class="card-text"><small class="text-muted" style="color: #6c757d;">AR$@articulo.Precio</small></p>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-danger" @onclick="() => EliminarDelCarrito_Click(articulo.Id)"
+                                    Style="background-color: #dc3545; border-color: #dc3545; border-radius: 0.25rem; padding: 0.5rem 1rem;">Eliminar del Carrito</button>
+                                <button class="btn btn-primary" @onclick="() => Detalles_Click(articulo.Id)"
+                                    Style="background-color: #007bff; border-color: #007bff; border-radius: 0.25rem; padding: 0.5rem 1rem;">Ver detalles</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<!-- Div alerta: confirmación de compra -->
+@if (mostrarAlerta)
+{
+    <div id="customAlert" class="custom-alert-content" style="display: block; position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); background-color: rgba(144, 238, 144, 0.5); z-index: 1000; padding: 20px; border-radius: 0.5rem;">
+        <div class="alert alert-success" role="alert" style="margin-bottom: 1rem;">
+            ¡Compra realizada exitosamente!
+        </div>
+        <div>
+            <button class="btn btn-success" style="border-radius: 0.25rem; padding: 0.5rem 1rem;" @onclick="BtnAceptar_Click">Aceptar</button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Articulos> listaCarrito = new List<Articulos>();
+    private int cantidadProductos = 0;
+    private decimal precioTotal = 0;
+    private bool mostrarAlerta = false;
+
+
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            if (HttpContext.Session.GetString("ListaVieja") != null)
+            {
+                if (HttpContext.Session.GetString("UsuarioActivo") == null)
+                {
+                    NavigationManager.NavigateTo("/Login", false);
+                    return;
+                }
+
+                listaCarrito = JsonSerializer.Deserialize<List<Articulos>>(HttpContext.Session.GetString("ListaVieja"));
+                ActualizarTotales();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error en OnInitialized");
+            HttpContext.Session.SetString("Error", JsonSerializer.Serialize(ex.ToString()));
+ NavigationManager.NavigateTo("/Error", false);
+        }
+    }
+
+    private void ActualizarTotales()
+    {
+        if (listaCarrito != null)
+        {
+            cantidadProductos = listaCarrito.Count;
+            precioTotal = 0;
+
+            foreach (var item in listaCarrito)
+            {
+                precioTotal += item.Precio;
+            }
+        }
+        else
+        {
+            cantidadProductos = 0;
+            precioTotal = 0;
+        }
+    }
+
+    private void VolverInicio_Click()
+    {
+        NavigationManager.NavigateTo("/ProductosCliente", false);
+    }
+
+    private void Detalles_Click(int id)
+    {
+        try
+        {
+            NavigationManager.NavigateTo($"/DetallesArticuloCliente?ID={id}", false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error en Detalles_Click");
+        HttpContext.Session.SetString("Error", JsonSerializer.Serialize(ex.ToString()));
+            NavigationManager.NavigateTo("/Error", false);
+        }
+    }
+
+    private void EliminarDelCarrito_Click(int id)
+    {
+        try
+        {
+            if (listaCarrito != null)
+            {
+                listaCarrito = listaCarrito.FindAll(x => x.Id != id);
+            HttpContext.Session.SetString("ListaVieja", JsonSerializer.Serialize(listaCarrito));
+                ActualizarTotales();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error en EliminarDelCarrito_Click");
+        HttpContext.Session.SetString("Error", JsonSerializer.Serialize(ex.ToString()));
+            NavigationManager.NavigateTo("/Error", false);
+        }
+    }
+
+    private void MostrarConfirmacion()
+    {
+        mostrarAlerta = true;
+    }
+
+    private void BtnAceptar_Click()
+    {
+        HttpContext.Session.Remove("ListaVieja");
+        NavigationManager.NavigateTo("/ProductosCliente", false);
+    }
+}
